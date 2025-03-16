@@ -1,9 +1,8 @@
 import fs from "node:fs";
+import { getTokensWithTypes, tokensToXML } from "./Tokenizer.js";
 
 function main () {
     const [path, type] = getWorkingPathAndType();
-
-    console.log(`Path: ${path}\nType: "${type}"`);
 
     if (type === "file") {
         processFile(path);
@@ -29,14 +28,9 @@ function getWorkingPathAndType() {
         path = process.argv[2];
     }
 
-    const slash = path[path.length-1] === "/" ? "": "/";
-
+    const slash = (path[path.length-1] === "/" || type === "file") ? "": "/";
+    
     return [path + slash, type];
-}
-
-function processFile(path) {
-    // TODO
-    console.log("Proessing: " + path);
 }
 
 function processDir(path) {
@@ -50,4 +44,20 @@ function processDir(path) {
         }
     }
 }
+
+function processFile(path) {
+    // TODO
+    console.log("Proessing: " + path);
+    const sourceCode = fs.readFileSync(path, "utf8");
+
+    const tokens = getTokensWithTypes(sourceCode);
+    const XML = tokensToXML(tokens);
+
+    const pathArr = path.split("/");
+    const fileName = pathArr[pathArr.length-1].slice(0, -5) + "T.xml";
+
+    console.log("Writing to: " + process.cwd() + "/" + fileName);
+    fs.writeFileSync(process.cwd() + "/" + fileName, XML);
+}
+
 
