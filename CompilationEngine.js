@@ -1,6 +1,6 @@
 const classTemplate = [["class", "keyword"], ["", "identifier"], ["{", "symbol"], ["}", "symbol"]];
-const classFieldVarDec = [["field", "keyword"], ["", "identifier"], ["", "identifier"], [";", "symbol"]];
-const classStaticVarDec = [["static", "keyword"], ["", "identifier"], ["", "identifier"], [";", "symbol"]];
+const varDec = [["", "keyword"], ["", "identifier"], ["", "identifier", "multPos"], [";", "symbol"]];
+const subroutineDec = [["", "keyword"], ["", "identifier"], ["", "identifier"], ["(", "symbol"], ["", "params"], [")", "symbol"], ["{", "symbol"], ["}", "symbol"]];
 
 export function compileFile(tokens) {
     let compilerOutput = "";
@@ -16,6 +16,10 @@ export function compileFile(tokens) {
     return compilerOutput;
 }
 
+function eat(token) {
+    return `<${token[1]}> ${token[0]} </${token[1]}>`;
+}
+
 function compileClass(tokens, i) {
     let compileClassOutput = "<class>";
 
@@ -23,18 +27,18 @@ function compileClass(tokens, i) {
         let outputData = "";
         switch(tokens[i][0]) {
             case "field":
-                [outputData, i] = compileClassVarDec(tokens, i, classFieldVarDec, 2);
+                [outputData, i] = compileVarDec(tokens, i, varDec, 2, "classVarDec");
                 j--;
                 break;
             case "static":
-                [outputData, i] = compileClassVarDec(tokens, i, classStaticVarDec, 2);
+                [outputData, i] = compileVarDec(tokens, i, varDec, 2, "classVarDec");
                 j--;
                 break;
             case "constructor":
-                break;
             case "method":
-                break;
             case "function":
+                [outputData, i] = compileSubroutineDec(tokens, i, subroutineDec, 2);
+                j--;
                 break;
             default:
                 outputData = eat(tokens[i]);
@@ -47,34 +51,94 @@ function compileClass(tokens, i) {
     return [compileClassOutput + "\n</class>", i]
 }
 
-function compileClassVarDec(tokens, i, compareTemp, tabN) {
-    let compileClassVarDecOutput = "<classVarDec>";
+function compileVarDec(tokens, i, compareTemp, tabN, type) {
+    let compileClassVarDecOutput = `<${type}>`;
     
-    while (tokens[i][0] !== ";") { 
-        compileClassVarDecOutput += "\n" + "\t".repeat(tabN) + eat(tokens[i]); 
-        i++;
+    for (let j = 0; j < compareTemp.length; j++, i++) {
+        if (compareTemp[j].length === 3) {
+            while(tokens[i][0] !== compareTemp[j+1][0]) {
+                compileClassVarDecOutput += "\n" + "\t".repeat(tabN) + eat(tokens[i]); 
+                i++;
+            }
+
+            j++;
+        } else {
+            compileClassVarDecOutput += "\n" + "\t".repeat(tabN) + eat(tokens[i]); 
+        }    
     }
-    
+
     compileClassVarDecOutput += "\n" + "\t".repeat(tabN) + eat([";", "symbol"]);
 
-    return [compileClassVarDecOutput + `\n${("\t".repeat(tabN-1))}</classVarDec>`, i];
+    return [compileClassVarDecOutput + `\n${("\t".repeat(tabN-1))}</${type}>`, --i];
 }
 
 function compileSubroutineDec(tokens, i, compareTemp, tabN) {
     let compileSubroutineDecOutput = "<subroutineDec>";
 
-    for (let j = 0; j < compareTemp.length; j++) {
-        compileSubroutineDecOutput += "\n" + "\t".repeat(tabN) + eat(tokens[i]);
+    for (let j = 0; j < compareTemp.length; j++, i++) {
+        let outputData = "";
+        console.log(tokens[i]);
+        if (compareTemp[j][1] === "params") {
+            [outputData, i] = compileParameterList(tokens, i, tabN+1); 
+        } else if (compareTemp[j][0] === "{") {
+            [outputData, i] = compileSubroutineBody(tokens, i, tabN+1);
+        } else {
+            outputData = eat(tokens[i]);
+        }
+        
+        compileSubroutineDecOutput += "\n" + "\t".repeat(tabN) + outputData;
     }
 
-    return [compileSubroutineDecOutput + `\n${("\t".repeat(tabN-1))}</subroutineDec>`, i];
+    return [compileSubroutineDecOutput + `\n${("\t".repeat(tabN-1))}</subroutineDec>`, --i];
 }
 
-function compileParameterList() {}
-function compileSubroutineBody() {}
-function compileVarDec() {}
-function compileStatements() {}
+function compileParameterList(tokens, i, tabN) {
+    let compileParameterListOutput = "<parameters>";
 
-function eat(token) {
-    return `<${token[1]}> ${token[0]} </${token[1]}>`;
+    while (tokens[i][0] !== ")") {
+        compileParameterListOutput += "\n" + "\t".repeat(tabN) + eat(tokens[i]);
+        i++;
+    }
+
+    return [compileParameterListOutput + `\n${("\t".repeat(tabN-1))}</parameters>`, --i];
 }
+
+function compileSubroutineBody(tokens, i, tabN) {
+    let compileSubroutineBodyOutput = "<subroutineBody>";
+    
+    compileSubroutineBodyOutput += `\n${("\t".repeat(tabN))}` + eat(tokens[i++]);
+
+    while(tokens[i][0] !== "}") {
+        let outputData = "";
+        if (tokens[i][0] === "var") {
+            [outputData, i] = compileVarDec(tokens, i, varDec, "varDec");
+        } else {
+            [outputData, i] = compileStatements(tokens, i, tabN+1);
+        }
+
+        compileSubroutineBodyOutput += "\n" + "\t".repeat(tabN) + outputData;
+        i++;
+    }
+
+    return [compileSubroutineBodyOutput + `\n${("\t".repeat(tabN-1))}</subroutineBody>`, --i];
+}
+function compileStatements(tokens, i, tabN) {
+    let compileStatementsOutput = "<statements>";
+
+    console.log("statements, tabN: " + tabN);
+
+    return [compileStatementsOutput + `\n${("\t".repeat(tabN-1))}</statements>`, i];
+}
+
+// Handling statements
+function compileLet() {}
+function compileIf() {}
+function compileWhile() {}
+function compileDo() {}
+function compileReturn() {}
+
+
+// Handling exxpression
+function compileExpression() {}
+function compileTerm() {}
+function compileExpressionList() {}
