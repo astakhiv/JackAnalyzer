@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { getTokensWithTypes, tokensToXML } from "./Tokenizer.js";
+import { compileFile } from "./CompilationEngine.js";
 
 function main () {
     const [path, type] = getWorkingPathAndType();
@@ -58,6 +59,8 @@ function processFile(path) {
 
     console.log("Writing to: " + process.cwd() + "/" + fileName);
     fs.writeFileSync(process.cwd() + "/" + fileName, XML);
+
+    const compilerOutput = compileFile(tokens);
 }
 
 
