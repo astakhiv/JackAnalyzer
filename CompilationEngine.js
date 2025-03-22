@@ -133,9 +133,6 @@ function compileSubroutineBody(tokens, i, tabN) {
 }
 
 
-const ifStatement = [["if", "keyword"], ["(", "symbol"], ["", "expression"], [")", "symbol"], ["{", "symbol"], ["", "statements"], ["}", "symbol"]];
-const whileStatement = [["while", "keyword"], ["(", "symbol"], ["", "expression"], [")", "symbol"], ["{", "symbol"], ["", "statements"], ["}", "symbol"]];
-
 function compileStatements(tokens, i, tabN) {
     let compileStatementsOutput = "<statements>";
 
@@ -162,11 +159,11 @@ function compileStatements(tokens, i, tabN) {
                 break statementsLoop;
         }
         
-        console.log("statements", tokens[i], i);
         compileStatementsOutput += "\n" + "\t".repeat(tabN) + outputData;
         i++;
     }
-
+    
+    console.log("statements exit:", tokens[i], i);
     return [compileStatementsOutput + `\n${("\t".repeat(tabN-1))}</statements>`, --i];
 }
 
@@ -202,12 +199,14 @@ function compileBlock(tokens, i, tabN) {
 
     [outputData, i] = compileStatements(tokens, i, tabN+1);
 
+    console.log("block after compileStatements:", i, tokens[i]);
+
     compileBlockOutput += "\n" + "\t".repeat(tabN) + outputData;
 
-    console.log("block", i, tokens[i]);
     compileBlockOutput += "\n" + "\t".repeat(tabN) + eat(tokens[++i]);
-
-    return [`\n${"\t".repeat(tabN)}${compileBlockOutput}`, --i];
+    
+    console.log("exit compileBlock", tokens[i], i);
+    return [compileBlockOutput, i];
 }
 
 
@@ -216,10 +215,9 @@ function compileIf(tokens, i, tabN) {
     let outputData = "";
 
     
-    while(tokens[i][0] !== "}" || (tokens[i+1][0] === "else")) {
-        console.log(tokens[i], i);
+    while(true) {
         if (tokens[i][0] === "(") {
-            outputData = "\n" + "\t".repeat(tabN) + eat(tokens[i++]);
+            outputData = eat(tokens[i++]);
             while(tokens[i][0] !== ")") {
                 i++;
             }
@@ -228,38 +226,53 @@ function compileIf(tokens, i, tabN) {
         } else if (tokens[i][0] === "{") {
             [outputData, i] = compileBlock(tokens, i, tabN);
         } else {
-            outputData = "\n" + "\t".repeat(tabN) + eat(tokens[i]);
+            outputData =  eat(tokens[i]);
         }
 
         compileIfOutput += "\n" + "\t".repeat(tabN) + outputData;
-        i++;
-    }
 
-    return [`\n${"\t".repeat(tabN-1)}${compileIfOutput}`, --i];
+        if (tokens[i][0] === "}" && tokens[i+1][0] !== "else") {
+            i++;
+            console.log("break:", i, tokens[i]);
+            break;
+        }
+
+        i++;    
+}
+    
+    return [compileIfOutput + `\n${"\t".repeat(tabN-1)}</ifStatement>`, --i];
     
 }
 
 function compileWhile(tokens, i, tabN) {
     let compileWhileOutput = "<whileStatement>";
     let outputData = "";
+    console.log("enter while", tokens[i], i);
 
-    while (tokens[i][0] !== "}") {
+    while (true) {
         if (tokens[i][0] === "(") {
-            outputData = "\n" + "\t".repeat(tabN) + eat(tokens[i++]);
+            outputData = eat(tokens[i++]);
             while(tokens[i][0] !== ")") {
                 i++;
             }
             outputData += "\n" + "\t".repeat(tabN) + ":) expression :)";
             outputData += "\n" + "\t".repeat(tabN) + eat(tokens[i]);
-        } else if (tokens[i] === "{") {
+        } else if (tokens[i][0] === "{") {
             [outputData, i] = compileBlock(tokens, i, tabN);
+        } else {
+            outputData = eat(tokens[i]);
         }
-
+        
+        console.log("while", tokens[i], i);
         compileWhileOutput += "\n" + "\t".repeat(tabN) + outputData;
+        if (tokens[i][0] === "}") {
+            i++;
+            break;
+        }
         i++;
     }
 
-    return [`\n${"\t".repeat(tabN-1)}${compileWhileOutput}`, --i];
+    return [compileWhileOutput + `\n${"\t".repeat(tabN-1)}</whileStatement>`, --i];
 }
 
 //function compileBlock(tokens, i, compareTemp, blockName, tabN) {
