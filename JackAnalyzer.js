@@ -55,12 +55,20 @@ function processFile(path) {
     const XML = tokensToXML(tokens);
 
     const pathArr = path.split("/");
-    const fileName = pathArr[pathArr.length-1].slice(0, -5) + "T.xml";
+    const fileNameT = pathArr[pathArr.length-1].slice(0, -5) + "T.xml";
 
-    console.log("Writing to: " + process.cwd() + "/" + fileName);
-    fs.writeFileSync(process.cwd() + "/" + fileName, XML);
+    console.log("Writing to: " + process.cwd() + "/" + fileNameT);
+    fs.writeFileSync(process.cwd() + "/" + fileNameT, XML);
 
     const compilerOutput = compileFile(tokens);
+    
+    const fileName = pathArr[pathArr.length-1].slice(0, -5) + ".xml";
+
+    console.log("Writing to: " + process.cwd() + "/" + fileName);
+    fs.writeFileSync(process.cwd() + "/" + fileName, compilerOutput);
+
+
+
 }
 
  

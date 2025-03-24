@@ -1,4 +1,5 @@
 export function compileFile(tokens) {
+
     let compilerOutput = "";
 
     for (let i = 0; i < tokens.length; i++) {
@@ -6,16 +7,14 @@ export function compileFile(tokens) {
             [compilerOutput, i] = compileClass(tokens, i);
         }
     }
-    
-    console.log(compilerOutput);
 
     return compilerOutput;
 }
 
-function eat(token) {
-    return `<${token[1]}> ${token[0]} </${token[1]}>`;
-}
+const eat = (token) => `<${token[1]}> ${token[0]} </${token[1]}>`;
+const indent = (tabN, str) => `\n${("\t".repeat(tabN))}${str}`;
 
+// Handling program structure
 
 const classTemplate = [["class", "keyword"], ["", "identifier"], ["{", "symbol"], ["}", "symbol"]];
 
@@ -24,13 +23,11 @@ function compileClass(tokens, i) {
 
     for (let j = 0; j < classTemplate.length; j++, i++) {
         let outputData = "";
+
         switch(tokens[i][0]) {
             case "field":
-                [outputData, i] = compileVarDec(tokens, i, varDec, "classVarDec", 2);
-                j--;
-                break;
             case "static":
-                [outputData, i] = compileVarDec(tokens, i, varDec, "classVarDec", 2);
+                [outputData, i] = compileVarDec(tokens, i, 2, "classVarDec");
                 j--;
                 break;
             case "constructor":
@@ -44,92 +41,93 @@ function compileClass(tokens, i) {
                 break;
         }
 
-        compileClassOutput += "\n\t" + outputData; 
+        compileClassOutput += indent(1, outputData); 
     }
 
-    return [compileClassOutput + "\n</class>", i]
+    return [compileClassOutput + indent(0, "</class>"), i]
 }
 
 
-const varDec = [["", "keyword"], ["", "identifier"], ["", "list"], [";", "symbol"]];
-
-function compileVarDec(tokens, i, compareTemp, type, tabN) {
-    let compileClassVarDecOutput = `<${type}>`;
+function compileVarDec(tokens, i, tabN, type) {
+    let compileVarDecOutput = `<${type}>`;
     
-    console.log(type, tokens[i], i);
-    for (let j = 0; j < compareTemp.length; j++, i++) {
-        if (compareTemp[j][1] === "list") {
-            while(tokens[i][0] !== compareTemp[j+1][0]) {
-                compileClassVarDecOutput += "\n" + "\t".repeat(tabN) + eat(tokens[i]); 
-                i++;
-            }
-
-            j++;
+    compileVarDecOutput += indent(tabN, eat(tokens[i++]));
+    compileVarDecOutput += indent(tabN, eat(tokens[i++]));
+    
+    let loop = true;
+    while(loop) {
+        compileVarDecOutput += indent(tabN, eat(tokens[i++]));
+        
+        if (tokens[i][0] === ",") {
+            compileVarDecOutput += indent(tabN, eat(tokens[i++]));
         } else {
-            compileClassVarDecOutput += "\n" + "\t".repeat(tabN) + eat(tokens[i]); 
-        }    
+            loop = false;
+        }
     }
-
-    compileClassVarDecOutput += "\n" + "\t".repeat(tabN) + eat([";", "symbol"]);
-
-    console.log(type, tokens[i], i);
-    return [compileClassVarDecOutput + `\n${("\t".repeat(tabN-1))}</${type}>`, --i];
+    
+    compileVarDecOutput += indent(tabN, eat(tokens[i]));
+    return [compileVarDecOutput + indent(tabN-1, `</${type}>`), i];
 }
 
 
-const subroutineDec = [["", "keyword"], ["", "identifier"], ["", "identifier"], ["(", "symbol"], ["parameters", "list"], [")", "symbol"], ["{", "symbol"], ["}", "symbol"]];
 
 function compileSubroutineDec(tokens, i, tabN) {
     let compileSubroutineDecOutput = "<subroutineDec>";
-    const compareTemp = subroutineDec;
+    let outputData = "";
+   
+    // Subroutine header
+    compileSubroutineDecOutput += indent(tabN, eat(tokens[i++]));
+    compileSubroutineDecOutput += indent(tabN, eat(tokens[i++]));
+    compileSubroutineDecOutput += indent(tabN, eat(tokens[i++]));
+    compileSubroutineDecOutput += indent(tabN, eat(tokens[i++]));
 
-    for (let j = 0; j < compareTemp.length; j++, i++) {
-        let outputData = "";
-        if (compareTemp[j][1] === "list") {
-            [outputData, i] = compileList(tokens, i, compareTemp[j][0], tabN+1); 
-        } else if (compareTemp[j][0] === "{") {
-            [outputData, i] = compileSubroutineBody(tokens, i, tabN+1);
-            j++;
-        } else {
-            outputData = eat(tokens[i]);
-        }
-        
-        compileSubroutineDecOutput += "\n" + "\t".repeat(tabN) + outputData;
-    }
+    // Parameters
+    [outputData, i] = compileParameterList(tokens, i, tabN+1);
 
-    return [compileSubroutineDecOutput + `\n${("\t".repeat(tabN-1))}</subroutineDec>`, --i];
+    compileSubroutineDecOutput += indent(tabN, outputData);
+    i++;
+
+    compileSubroutineDecOutput += indent(tabN, eat(tokens[i++]));
+
+    // Subroutine body
+    [outputData, i] = compileSubroutineBody(tokens, i, tabN+1); 
+    compileSubroutineDecOutput += indent(tabN, outputData);
+
+    return [compileSubroutineDecOutput + indent(tabN-1, "</subroutineDec>"), i];
 }
 
-function compileList(tokens, i, listName, tabN) {
-    let compileListOutput = `<${listName}>`;
+
+function compileParameterList(tokens, i, tabN) {
+    let compileParameterListOutput = `<parameterList>`;
 
     while (tokens[i][0] !== ")") {
-        compileListOutput += "\n" + "\t".repeat(tabN) + eat(tokens[i]);
+        compileParameterListOutput += indent(tabN, eat(tokens[i]));
         i++;
     }
 
-    return [compileListOutput + `\n${("\t".repeat(tabN-1))}</${listName}>`, --i];
+    return [compileParameterListOutput + indent(tabN-1, `</parameterList>`), --i];
 }
 
 function compileSubroutineBody(tokens, i, tabN) {
     let compileSubroutineBodyOutput = "<subroutineBody>";
     
-    compileSubroutineBodyOutput += `\n${("\t".repeat(tabN))}` + eat(tokens[i++]);
+    compileSubroutineBodyOutput += indent(tabN, eat(tokens[i++]));
     
     while(tokens[i][0] !== "}") {
         let outputData = "";
         if (tokens[i][0] === "var") {
-            [outputData, i] = compileVarDec(tokens, i, varDec, "varDec", tabN+1);
+            [outputData, i] = compileVarDec(tokens, i, tabN+1, "varDec");
         } else {
             [outputData, i] = compileStatements(tokens, i, tabN+1);
         }
 
-        compileSubroutineBodyOutput += "\n" + "\t".repeat(tabN) + outputData;
+        compileSubroutineBodyOutput += indent(tabN, outputData);
         i++;
     }
-    compileSubroutineBodyOutput += "\n" + "\t".repeat(tabN) + eat(tokens[i]);
 
-    return [compileSubroutineBodyOutput + `\n${("\t".repeat(tabN-1))}</subroutineBody>`, i];
+    compileSubroutineBodyOutput += indent(tabN, eat(tokens[i]));
+
+    return [compileSubroutineBodyOutput + indent(tabN-1, "</subroutineBody>"), i];
 }
 
 
@@ -159,53 +157,51 @@ function compileStatements(tokens, i, tabN) {
                 break statementsLoop;
         }
         
-        compileStatementsOutput += "\n" + "\t".repeat(tabN) + outputData;
+        compileStatementsOutput += indent(tabN, outputData);
         i++;
     }
     
-    console.log("statements exit:", tokens[i], i);
-    return [compileStatementsOutput + `\n${("\t".repeat(tabN-1))}</statements>`, --i];
+    return [compileStatementsOutput + indent(tabN-1, "</statements>"), --i];
 }
 
 // Handling statements
 
-const letStatement = [["let", "keyword"], ["", "identifier"], ["=", "symbol"], ["", "expression"], [";", "symbol"]];
 function compileLet(tokens, i, tabN) {
-    const compareTemp = letStatement;
     let compileLetOutput = "<letStatement>";
+    let outputData = "";
 
-    for (let j = 0; j < compareTemp.length; j++, i++) {
-        if (compareTemp[j][1] === "expression") {
-            while (tokens[i][0] !== compareTemp[j+1][0]) {
-                i++;
-            }
-            compileLetOutput += "\n" + "\t".repeat(tabN) + ":) exprextion :)"; 
-            compileLetOutput += "\n" + "\t".repeat(tabN) + eat(tokens[i]);
-            j++;
-        } else {
-            compileLetOutput += "\n" + "\t".repeat(tabN) + eat(tokens[i]);
-        }
+    compileLetOutput += indent(tabN, eat(tokens[i++])); 
+    compileLetOutput += indent(tabN, eat(tokens[i++])); 
+
+    if (tokens[i][0] === "[") {
+        [outputData, i] = compileExpression(tokens, i, tabN+1);
+        compileLetOutput += indent(tabN, outputData);
+        i++;
+        compileLetOutput += indent(tabN, eat[tokens[i++]]);
     }
 
-    return [compileLetOutput + `\n${("\t".repeat(tabN-1))}</letStatement>`, --i];
+    compileLetOutput += indent(tabN, eat(tokens[i++]));
+
+    [outputData, i] = compileExpression(tokens, i, tabN+1);
+    compileLetOutput += indent(tabN, outputData);
+    i++;
+    compileLetOutput += indent(tabN, eat(tokens[i]));
+
+    return [compileLetOutput + indent(tabN-1, "</letStatement>"), i];
 }
 
-// Parse block
-
 function compileBlock(tokens, i, tabN) {
-    console.log("enter compileBlock", tokens[i], i);
-    let compileBlockOutput = eat(tokens[i++]);
     let outputData = "";
+
+    let compileBlockOutput = eat(tokens[i++]);
 
     [outputData, i] = compileStatements(tokens, i, tabN+1);
 
-    console.log("block after compileStatements:", i, tokens[i]);
+    compileBlockOutput += indent(tabN, outputData);
+    i++;
 
-    compileBlockOutput += "\n" + "\t".repeat(tabN) + outputData;
-
-    compileBlockOutput += "\n" + "\t".repeat(tabN) + eat(tokens[++i]);
+    compileBlockOutput += indent(tabN, eat(tokens[i]));
     
-    console.log("exit compileBlock", tokens[i], i);
     return [compileBlockOutput, i];
 }
 
@@ -214,159 +210,154 @@ function compileIf(tokens, i, tabN) {
     let compileIfOutput = "<ifStatement>";
     let outputData = "";
 
+    compileIfOutput += indent(tabN, eat(tokens[i++]));
+    compileIfOutput += indent(tabN, eat(tokens[i++]));
     
-    while(true) {
-        if (tokens[i][0] === "(") {
-            outputData = eat(tokens[i++]);
-            while(tokens[i][0] !== ")") {
-                i++;
-            }
-            outputData += "\n" + "\t".repeat(tabN) + ":) expression :)";
-            outputData += "\n" + "\t".repeat(tabN) + eat(tokens[i]);
-        } else if (tokens[i][0] === "{") {
-            [outputData, i] = compileBlock(tokens, i, tabN);
-        } else {
-            outputData =  eat(tokens[i]);
-        }
+    [outputData, i] = compileExpression(tokens, i, tabN+1);
+    compileIfOutput += indent(tabN, outputData);
+    i++;
 
-        compileIfOutput += "\n" + "\t".repeat(tabN) + outputData;
+    compileIfOutput += indent(tabN, eat(tokens[i++]));
 
-        if (tokens[i][0] === "}" && tokens[i+1][0] !== "else") {
-            i++;
-            console.log("break:", i, tokens[i]);
-            break;
-        }
+    [outputData, i] = compileBlock(tokens, i, tabN);
+    compileIfOutput += indent(tabN, outputData);
+    i++;
 
-        i++;    
+    if (tokens[i][0] === "else") {
+        compileIfOutput += indent(tabN, eat(tokens[i++]));
+        
+        [outputData, i] = compileBlock(tokens, i, tabN);
+        compileIfOutput += indent(tabN, outputData);
+        i++;
+    }
+
+    return [compileIfOutput + indent(tabN-1, "</ifStatement>"), --i];
 }
-    
-    return [compileIfOutput + `\n${"\t".repeat(tabN-1)}</ifStatement>`, --i];
-    
-}
+
 
 function compileWhile(tokens, i, tabN) {
     let compileWhileOutput = "<whileStatement>";
     let outputData = "";
-    console.log("enter while", tokens[i], i);
+    
+    compileWhileOutput += indent(tabN, eat(tokens[i++]));
+    compileWhileOutput += indent(tabN, eat(tokens[i++]));
 
-    while (true) {
-        if (tokens[i][0] === "(") {
-            outputData = eat(tokens[i++]);
-            while(tokens[i][0] !== ")") {
-                i++;
-            }
-            outputData += "\n" + "\t".repeat(tabN) + ":) expression :)";
-            outputData += "\n" + "\t".repeat(tabN) + eat(tokens[i]);
-        } else if (tokens[i][0] === "{") {
-            [outputData, i] = compileBlock(tokens, i, tabN);
-        } else {
-            outputData = eat(tokens[i]);
-        }
-        
-        console.log("while", tokens[i], i);
-        compileWhileOutput += "\n" + "\t".repeat(tabN) + outputData;
-        if (tokens[i][0] === "}") {
-            i++;
-            break;
-        }
+    [outputData, i] = compileExpression(tokens, i, tabN+1)
+    compileWhileOutput += indent(tabN, outputData);
+    i++;
+
+    compileWhileOutput += indent(tabN, eat(tokens[i++]));
+    
+    [outputData, i] = compileBlock(tokens, i, tabN)
+    compileWhileOutput += indent(tabN, outputData);
+
+    return [compileWhileOutput + indent(tabN-1, "</whileStatement>"), i];
+}
+
+
+function compileDo(tokens, i, tabN) {
+    let compileDoOutput = "<doStatement>";
+    let outputData = "";
+
+    compileDoOutput += indent(tabN, eat(tokens[i++]));
+    compileDoOutput += indent(tabN, eat(tokens[i++]));
+
+
+    if (tokens[i][0] === ".") {
+        compileDoOutput += indent(tabN, eat(tokens[i++]));
+        compileDoOutput += indent(tabN, eat(tokens[i++]));
+    } 
+ 
+    compileDoOutput += indent(tabN, eat(tokens[i++]));
+    
+    [outputData, i] = compileExpressionList(tokens, i, tabN+1);
+    compileDoOutput += indent(tabN, outputData);
+    i++;
+
+    compileDoOutput += indent(tabN, eat(tokens[i++]));
+    compileDoOutput += indent(tabN, eat(tokens[i++]));
+    
+    
+    return [compileDoOutput + indent(tabN-1, "</doStatement>"), --i];
+}
+
+
+function compileReturn(tokens, i, tabN) {
+    let compileReturnOutput = "<returnStatement>";
+    let outputData = "";
+
+    compileReturnOutput += indent(tabN, eat(tokens[i++]));    
+
+    if (tokens[i][0] !== ";") {
+        [outputData, i] = compileExpression(tokens, i, tabN+1);
+        compileReturnOutput += indent(tabN, outputData);
         i++;
     }
 
-    return [compileWhileOutput + `\n${"\t".repeat(tabN-1)}</whileStatement>`, --i];
-}
+    compileReturnOutput += indent(tabN, eat(tokens[i++]));        
 
-//function compileBlock(tokens, i, compareTemp, blockName, tabN) {
-//    let compileIfOutput = `<${blockName}>`;
-//   
-//
-//    for (let j = 0; j < compareTemp.length; j++, i++) {
-//        console.log(tokens[i], i);
-//        let outputData = "";
-//
-//        if (compareTemp[j][1] === "expression") {
-//            while (tokens[i][0] !== compareTemp[j+1][0]) {
-//                i++;
-//            }
-//            outputData = ":) exprextion :)";
-//            outputData += "\n" + "\t".repeat(tabN) + eat(tokens[i]);
-//            j++;
-//        } else if (compareTemp[j][1] === "statements") {
-//            [outputData, i] = compileStatements(tokens, i, tabN+1);
-//            console.log("after statements");
-//            outputData += "\n" + "\t".repeat(tabN) + eat(tokens[i]);
-//        } else {
-//            outputData = eat(tokens[i]);
-//        }
-//
-//        compileIfOutput += "\n" + "\t".repeat(tabN) + outputData;
-//    }
-//    
-//    return [compileIfOutput + `\n${("\t".repeat(tabN-1))}</${blockName}>`, --i];
-//}
-
-
-const doStatement = [["do", "keyword"], ["", "identifier"], ["(", "symbol"], ["", "expressionList"], [")", "symbol"], [";", "symbol"]];
-
-function compileDo(tokens, i, tabN) {
-    const compareTemp = doStatement;
-    let compileDoOutput = "<doStatement>";
-    
-    
-    for (let j = 0; j < compareTemp.length; j++, i++) {
-        let outputData = "";
-        if (tokens[i][0] !== "(" && compareTemp[j][0] === "(") {
-            while(tokens[i][0] !== "(") {
-                compileDoOutput += "\n" + "\t".repeat(tabN) + eat(tokens[i]);
-                i++;
-            }
-            outputData = eat(tokens[i]);
-        } else if (compareTemp[j][1] === "expressionList") {
-            while (tokens[i][0] !== compareTemp[j+1][0]) {
-                i++;
-            }
-            outputData += ":) expressionList :)";
-            outputData += "\n" + "\t".repeat(tabN) + eat(tokens[i]);
-            j++;
-        } else {
-            outputData += eat(tokens[i]);
-        }
-
-        compileDoOutput += "\n" + "\t".repeat(tabN) + outputData;
-    }
-
-    return [compileDoOutput + `\n${("\t".repeat(tabN-1))}</doStatement>`, --i];
-}
-
-
-const returnStatement = [["return", "keyword"], ["?", "expression"], [";", "symbol"]];
-
-function compileReturn(tokens, i, tabN) {
-    const compareTemp = returnStatement;
-    let compileReturnOutput = "<returnStatement>";
-    for(let j = 0; j < compareTemp.length; j++, i++) {
-        let outputData = "";
-        if (tokens[i][0] === ";" && compareTemp[j][0] !== ";") {
-            i--;
-            continue;
-        } else if (compareTemp[j][1] === "expression") {
-            while(tokens[i][0] !== compareTemp[j+1][0]) {
-                i++;
-            }
-            outputData += ":) exprextion :)"; 
-            outputData += "\n" + "\t".repeat(tabN) + eat(tokens[i]);
-            j++;
-        } else {
-            outputData = eat(tokens[i]);
-        }
-
-        compileReturnOutput += "\n" + "\t".repeat(tabN) + outputData;
-    }
-
-    return [compileReturnOutput + `\n${("\t".repeat(tabN-1))}</returnStatement>`, --i];
+    return [compileReturnOutput + indent(tabN-1, "</returnStatement>"), --i];
 }
 
 
 // Handling expression
-function compileExpression() {}
-function compileTerm() {}
-function compileExpressionList() {}
+
+const opList = {"+": true, "-": true, "*": true, "/": true, "&": true, "|": true, "<": true, ">": true, "=": true};
+
+function compileExpression(tokens, i, tabN) {
+    let compileExpressionOutput = "<expression>";
+
+    let loop = true;
+    while (loop) {
+        let outputData = "";
+
+        [outputData, i] = compileTerm(tokens, i, tabN+1);
+        i++; 
+    
+        if (opList[tokens[i][0]] === true) {
+            outputData += indent(tabN, eat(tokens[i]));
+            i++;
+        } else {
+            loop = false;
+        }
+
+        compileExpressionOutput += indent(tabN, outputData);
+    }
+
+    return [compileExpressionOutput + indent(tabN-1, "</expression>"), --i];
+}
+
+
+const constantList = {"integerConstant": true, "stringConstant": true, "keyword": true};
+const additionalIdentifierSymbols = {"[": true, "(": true, ".": true};
+
+function compileTerm(tokens, i, tabN) {
+    let compileTermOutput = "<term>";
+
+    if (constantList[tokens[i][1]] || (tokens[i][1] === "identifier" && additionalIdentifierSymbols[tokens[i+1][0]] === undefined)) {
+        compileTermOutput += indent(tabN, eat(tokens[i]));
+        i++;
+    }
+
+    return [compileTermOutput + indent(tabN-1, "</term>"), --i];
+}
+
+
+function compileExpressionList(tokens, i, tabN) {
+    let compileExpressionListOutput = "<expressionList>";
+    let outputData = "";
+
+    while(tokens[i][0] !== ")") {
+        [outputData, i] = compileExpression(tokens, i, tabN+1);
+        i++;
+
+        if (tokens[i][0] === ",") {
+            outputData += indent(tabN, eat(tokens[i]));
+            i++;
+        } 
+
+        compileExpressionListOutput += indent(tabN, outputData);
+    }
+
+    return [compileExpressionListOutput + indent(tabN-1, "</expressionList>"), --i];
+}
