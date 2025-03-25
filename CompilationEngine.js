@@ -1,5 +1,4 @@
 export function compileFile(tokens) {
-
     let compilerOutput = "";
 
     for (let i = 0; i < tokens.length; i++) {
@@ -20,10 +19,9 @@ const classTemplate = [["class", "keyword"], ["", "identifier"], ["{", "symbol"]
 
 function compileClass(tokens, i) {
     let compileClassOutput = "<class>";
+    let outputData = "";
 
     for (let j = 0; j < classTemplate.length; j++, i++) {
-        let outputData = "";
-
         switch(tokens[i][0]) {
             case "field":
             case "static":
@@ -110,11 +108,11 @@ function compileParameterList(tokens, i, tabN) {
 
 function compileSubroutineBody(tokens, i, tabN) {
     let compileSubroutineBodyOutput = "<subroutineBody>";
+    let outputData = "";
     
     compileSubroutineBodyOutput += indent(tabN, eat(tokens[i++]));
     
     while(tokens[i][0] !== "}") {
-        let outputData = "";
         if (tokens[i][0] === "var") {
             [outputData, i] = compileVarDec(tokens, i, tabN+1, "varDec");
         } else {
@@ -133,9 +131,9 @@ function compileSubroutineBody(tokens, i, tabN) {
 
 function compileStatements(tokens, i, tabN) {
     let compileStatementsOutput = "<statements>";
-
+    let outputData = "";
+    
     statementsLoop: while (true) {
-        let outputData = "";
 
         switch (tokens[i][0]) {
             case "let":
@@ -188,16 +186,16 @@ function compileLet(tokens, i, tabN) {
     [outputData, i] = compileExpression(tokens, i, tabN+1);
     compileLetOutput += indent(tabN, outputData);
     i++;
+
     compileLetOutput += indent(tabN, eat(tokens[i]));
 
     return [compileLetOutput + indent(tabN-1, "</letStatement>"), i];
 }
 
 function compileBlock(tokens, i, tabN) {
-    let outputData = "";
-
     let compileBlockOutput = eat(tokens[i++]);
-
+    let outputData = "";
+    
     [outputData, i] = compileStatements(tokens, i, tabN+1);
 
     compileBlockOutput += indent(tabN, outputData);
@@ -309,16 +307,16 @@ const opList = {"+": true, "-": true, "*": true, "/": true, "&amp;": true, "|": 
 
 function compileExpression(tokens, i, tabN) {
     let compileExpressionOutput = "<expression>";
-
+    
     let outputData = "";
     let loop = true;
+    
     while (loop) {
         [outputData, i] = compileTerm(tokens, i, tabN+1);
         i++; 
     
         if (opList[tokens[i][0]] === true) {
-            outputData += indent(tabN, eat(tokens[i]));
-            i++;
+            outputData += indent(tabN, eat(tokens[i++]));
         } else {
             loop = false;
         }
@@ -337,7 +335,6 @@ function compileTerm(tokens, i, tabN) {
     let compileTermOutput = "<term>";
     let outputData = "";
     
-    console.log("compileTerm:", tokens[i], i);
     if (constantList[tokens[i][1]] || (tokens[i][1] === "identifier" && additionalIdentifierSymbols[tokens[i+1][0]] === undefined)) {
         compileTermOutput += indent(tabN, eat(tokens[i++]));
     } else if (tokens[i][1] === "identifier") {
@@ -375,7 +372,6 @@ function compileTerm(tokens, i, tabN) {
         i++;
     }
 
-    console.log("compileTerm end:", tokens[i], i);
     return [compileTermOutput + indent(tabN-1, "</term>"), --i];
 }
 
