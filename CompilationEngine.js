@@ -174,10 +174,13 @@ function compileLet(tokens, i, tabN) {
     compileLetOutput += indent(tabN, eat(tokens[i++])); 
 
     if (tokens[i][0] === "[") {
+        compileLetOutput += indent(tabN, eat(tokens[i++]));
+        
         [outputData, i] = compileExpression(tokens, i, tabN+1);
         compileLetOutput += indent(tabN, outputData);
         i++;
-        compileLetOutput += indent(tabN, eat[tokens[i++]]);
+
+        compileLetOutput += indent(tabN, eat(tokens[i++]));
     }
 
     compileLetOutput += indent(tabN, eat(tokens[i++]));
@@ -302,15 +305,14 @@ function compileReturn(tokens, i, tabN) {
 
 // Handling expression
 
-const opList = {"+": true, "-": true, "*": true, "/": true, "&": true, "|": true, "<": true, ">": true, "=": true};
+const opList = {"+": true, "-": true, "*": true, "/": true, "&amp;": true, "|": true, "&lt;": true, "&gt;": true, "=": true};
 
 function compileExpression(tokens, i, tabN) {
     let compileExpressionOutput = "<expression>";
 
+    let outputData = "";
     let loop = true;
     while (loop) {
-        let outputData = "";
-
         [outputData, i] = compileTerm(tokens, i, tabN+1);
         i++; 
     
@@ -333,12 +335,47 @@ const additionalIdentifierSymbols = {"[": true, "(": true, ".": true};
 
 function compileTerm(tokens, i, tabN) {
     let compileTermOutput = "<term>";
-
+    let outputData = "";
+    
+    console.log("compileTerm:", tokens[i], i);
     if (constantList[tokens[i][1]] || (tokens[i][1] === "identifier" && additionalIdentifierSymbols[tokens[i+1][0]] === undefined)) {
-        compileTermOutput += indent(tabN, eat(tokens[i]));
+        compileTermOutput += indent(tabN, eat(tokens[i++]));
+    } else if (tokens[i][1] === "identifier") {
+        compileTermOutput += indent(tabN, eat(tokens[i++]));
+        compileTermOutput += indent(tabN, eat(tokens[i++]));
+        
+        if (tokens[i-1][0] === "[") {
+            [outputData, i] = compileExpression(tokens, i, tabN+1);
+        } else  {
+            if (tokens[i-1][0] === ".") {
+                compileTermOutput += indent(tabN, eat(tokens[i++]));
+                compileTermOutput += indent(tabN, eat(tokens[i++]));
+            }
+
+            [outputData, i] = compileExpressionList(tokens, i, tabN+1);
+        }
+
+        compileTermOutput += indent(tabN, outputData);
+        i++;
+
+        compileTermOutput += indent(tabN, eat(tokens[i++]));
+    } else if (tokens[i][0] === "(") { 
+        compileTermOutput += indent(tabN, eat(tokens[i++]));
+
+        [outputData, i] = compileExpression(tokens, i, tabN+1);
+        compileTermOutput += indent(tabN, outputData);
+        i++;
+
+        compileTermOutput += indent(tabN, eat(tokens[i++]));
+    } else {
+        compileTermOutput += indent(tabN, eat(tokens[i++]));
+        
+        [outputData, i] = compileTerm(tokens, i, tabN+1);
+        compileTermOutput += indent(tabN, outputData);
         i++;
     }
 
+    console.log("compileTerm end:", tokens[i], i);
     return [compileTermOutput + indent(tabN-1, "</term>"), --i];
 }
 
