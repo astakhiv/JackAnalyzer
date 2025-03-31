@@ -3,12 +3,13 @@ import { classSymbolTable, subroutineSymbolTable, classVariableSymbolTable, meth
 export function compileFile(tokens) {
     let compilerOutput = "";
 
-    for (let i = 0; i < tokens.length; i++) {
+    let i = 0;
+    for (i = 0; i < tokens.length; i++) {
         if (tokens[i][0] === "class") {
             [compilerOutput, i] = compileClass(tokens, i);
         }
     }
-
+    
     return compilerOutput;
 }
 
@@ -16,34 +17,38 @@ const eat = (token) => `<${token[1]}> ${token[0]} </${token[1]}>`;
 const indent = (tabN, str) => `\n${("\t".repeat(tabN))}${str}`;
 
 const symbolTables = [classSymbolTable, subroutineSymbolTable, classVariableSymbolTable, methodVariableSymbolTable];
+
 function eatIdentifier(token, tabN, state="used") {
     let tokenData;
-    for (let i = 0; tokenData === undefined; i++) {
+    for (let i = 0; (i < symbolTables.length) && tokenData === undefined; i++) {
         tokenData = symbolTables[i][token[0]];
     } 
-    
-    let eatIdentifierOutput = `<identifier>`;
-    eatIdentifierOutput += indent(tabN, eat([tokenData[0], "name"]));
-    eatIdentifierOutput += indent(tabN, eat([tokenData[1], "type"]));
-    eatIdentifierOutput += indent(tabN, eat([tokenData[2], "kind"]));
-    eatIdentifierOutput += indent(tabN, eat([tokenData[3], "index"]));
-    eatIdentifierOutput += indent(tabN, eat([state, "state"]));
-    eatIdentifierOutput += indent(tabN-1, "</identifier>"); 
-    
+
+
+    let eatIdentifierOutput = "";
+    if (tokenData === undefined) {
+        eatIdentifierOutput = eat(token);
+    } else {
+
+        eatIdentifierOutput = `<identifier>`;
+        eatIdentifierOutput += indent(tabN, eat([tokenData[0], "name"]));
+        eatIdentifierOutput += indent(tabN, eat([tokenData[1], "type"]));
+        eatIdentifierOutput += indent(tabN, eat([tokenData[2], "kind"]));
+        eatIdentifierOutput += indent(tabN, eat([tokenData[3], "index"]));
+        eatIdentifierOutput += indent(tabN, eat([state, "state"]));
+        eatIdentifierOutput += indent(tabN-1, "</identifier>"); 
+    }
 
     return eatIdentifierOutput;
 }
 // Handling program structure
 let curClass = "";
-let curSubroutine = "";
 
 let variableKindCount = {"static": 0, "field": 0, "local": 0, "argument": 0};
 
 function compileClass(tokens, i) {
     clearTable(classVariableSymbolTable);
-
-    variableKindCount["static"] = 0;
-    variableKindCount["field"] = 0;
+    variableKindCount = {"static": 0, "field": 0, "local": 0, "argument": 0};
     
     const tabN = 1;
     let compileClassOutput = "<class>";
@@ -51,10 +56,9 @@ function compileClass(tokens, i) {
 
     compileClassOutput += indent(tabN, eat(tokens[i++]));
     curClass = tokens[i][0];
-    
-    classSymbolTable[tokens[i][0]] = [tokens[i][0], tokens[i][0], "class", NaN];
 
     compileClassOutput += indent(tabN, eatIdentifier(tokens[i++], tabN+1, "declared"));
+            
     compileClassOutput += indent(tabN, eat(tokens[i++]));
 
     while(tokens[i][0] !== "}") {
@@ -85,11 +89,12 @@ const variableKind = {"field": "field", "static": "static", "var": "local"};
 function compileVarDec(tokens, i, tabN, type) {
     let compileVarDecOutput = `<${type}>`;
     
-    const variableData = ["", "", "", NaN];
+    let variableData = ["", "", "", NaN];
     const symbolTable = (type === "classVarDec") ? classVariableSymbolTable : methodVariableSymbolTable;
      
     variableData[2] = variableKind[tokens[i][0]];
     compileVarDecOutput += indent(tabN, eat(tokens[i++]));
+    
     variableData[1] = tokens[i][0];
     compileVarDecOutput += indent(tabN, eat(tokens[i++]));
     
@@ -102,6 +107,7 @@ function compileVarDec(tokens, i, tabN, type) {
         
         if (tokens[i][0] === ",") {
             compileVarDecOutput += indent(tabN, eat(tokens[i++]));
+            variableData = Array.from(variableData);
         } else {
             loop = false;
         }
@@ -114,22 +120,18 @@ function compileVarDec(tokens, i, tabN, type) {
 
 
 function compileSubroutineDec(tokens, i, tabN) {
-    clearTable(methodVariableSymbolTable);
     variableKindCount["local"] = 0;
+
 
     let compileSubroutineDecOutput = "<subroutineDec>";
     let outputData = "";
    
-    const subroutineData = ["", "subroutine", "", NaN];
     // Subroutine header
-    subroutineData[2] = tokens[i][0];
     compileSubroutineDecOutput += indent(tabN, eat(tokens[i++]));
     compileSubroutineDecOutput += indent(tabN, eat(tokens[i++]));
 
-    curSubroutine = tokens[i][0];
-    subroutineData[0] = `${curClass}.${curSubroutine}`;
-    subroutineSymbolTable[tokens[i][0]] = subroutineData;
-    compileSubroutineDecOutput += indent(tabN, eatIdentifier(tokens[i++], tabN+1, "declared"));
+    compileSubroutineDecOutput += indent(tabN, eatIdentifier([`${curClass}.${tokens[i][0]}`, "identifier"], tabN+1, "declared"));
+    i++;
     compileSubroutineDecOutput += indent(tabN, eat(tokens[i++]));
 
     // Parameters
@@ -143,6 +145,7 @@ function compileSubroutineDec(tokens, i, tabN) {
     [outputData, i] = compileSubroutineBody(tokens, i, tabN+1); 
     compileSubroutineDecOutput += indent(tabN, outputData);
 
+    clearTable(methodVariableSymbolTable);
     return [compileSubroutineDecOutput + indent(tabN-1, "</subroutineDec>"), i];
 }
 
@@ -329,21 +332,11 @@ function compileDo(tokens, i, tabN) {
 
     compileDoOutput += indent(tabN, eat(tokens[i++]));
     
-    compileDoOutput += indent(tabN, eat(tokens[i++], tabN+1));
-
-
-    if (tokens[i][0] === ".") {
-        compileDoOutput += indent(tabN, eat(tokens[i++]));
-        compileDoOutput += indent(tabN, eat(tokens[i++]));
-    } 
- 
-    compileDoOutput += indent(tabN, eat(tokens[i++]));
-    
-    [outputData, i] = compileExpressionList(tokens, i, tabN+1);
+    [outputData, i] = compileFunctionCall(tokens, i, tabN);
     compileDoOutput += indent(tabN, outputData);
     i++;
 
-    compileDoOutput += indent(tabN, eat(tokens[i++]));
+
     compileDoOutput += indent(tabN, eat(tokens[i++]));
     
     
@@ -403,27 +396,24 @@ function compileTerm(tokens, i, tabN) {
     let compileTermOutput = "<term>";
     let outputData = "";
     
-    if (constantList[tokens[i][1]] || (tokens[i][1] === "identifier" && additionalIdentifierSymbols[tokens[i+1][0]] === undefined)) {
+    if (constantList[tokens[i][1]]) {
         compileTermOutput += indent(tabN, eat(tokens[i++]));
-    } else if (tokens[i][1] === "identifier") {
+    } else if (tokens[i][1] === "identifier" && additionalIdentifierSymbols[tokens[i+1][0]] === undefined) {
+        compileTermOutput += indent(tabN, eatIdentifier(tokens[i++], tabN+1));
+    } else if (tokens[i][1] === "identifier" && tokens[i+1][0] === "[") {
+        compileTermOutput += indent(tabN, eatIdentifier(tokens[i++], tabN+1));
         compileTermOutput += indent(tabN, eat(tokens[i++]));
-        compileTermOutput += indent(tabN, eat(tokens[i++]));
-        
-        if (tokens[i-1][0] === "[") {
-            [outputData, i] = compileExpression(tokens, i, tabN+1);
-        } else  {
-            if (tokens[i-1][0] === ".") {
-                compileTermOutput += indent(tabN, eat(tokens[i++]));
-                compileTermOutput += indent(tabN, eat(tokens[i++]));
-            }
 
-            [outputData, i] = compileExpressionList(tokens, i, tabN+1);
-        }
-
+        [outputData, i] = compileExpression(tokens, i, tabN+1);
         compileTermOutput += indent(tabN, outputData);
         i++;
 
         compileTermOutput += indent(tabN, eat(tokens[i++]));
+    } else if (tokens[i][1] === "identifier") {
+        [outputData, i] = compileFunctionCall(tokens, i, tabN);
+        compileTermOutput += indent(tabN, outputData);
+        i++;
+
     } else if (tokens[i][0] === "(") { 
         compileTermOutput += indent(tabN, eat(tokens[i++]));
 
@@ -441,6 +431,44 @@ function compileTerm(tokens, i, tabN) {
     }
 
     return [compileTermOutput + indent(tabN-1, "</term>"), --i];
+}
+
+
+function compileFunctionCall(tokens, i, tabN) {
+    let compileFunctionCallOutput = "";
+    let outputData = "";
+    
+    if (tokens[i+1][0] === "(") {
+        compileFunctionCallOutput += eatIdentifier([`${curClass}.${tokens[i++][0]}`, "identifier"], tabN+1);
+    } else {
+        let call = "";
+        if (methodVariableSymbolTable[tokens[i][0]]) {
+            call = methodVariableSymbolTable[tokens[i][0]][1];
+        } else if (classVariableSymbolTable[tokens[i][0]]) {
+            call = classVariableSymbolTable[tokens[i][0]][1];
+        } else {
+            call = tokens[i][0];
+        }
+        
+        call += ".";
+        i+=2;
+        
+        call += tokens[i][0];
+
+
+        compileFunctionCallOutput += indent(tabN, eatIdentifier([call, "identifier"], tabN+1));
+        i++;
+    }
+
+    compileFunctionCallOutput += eat(tokens[i++]);
+    
+    [outputData, i] = compileExpressionList(tokens, i, tabN+1);
+    compileFunctionCallOutput += indent(tabN, outputData);
+    i++;
+
+    compileFunctionCallOutput += indent(tabN, eat(tokens[i++]));
+
+    return [compileFunctionCallOutput, --i];
 }
 
 

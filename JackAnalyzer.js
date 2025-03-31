@@ -1,12 +1,18 @@
-import fs from "node:fs";
 import { getTokensWithTypes, tokensToXML } from "./Tokenizer.js";
+import fs from "node:fs";
 import { compileFile } from "./CompilationEngine.js";
+import { classSymbolTable, composeSymbolTable, subroutineSymbolTable } from "./SymbolTables.js";
+
+export let curPath = process.cwd();
+
 
 function main () {
     const [path, type] = getWorkingPathAndType();
 
+    curPath = path;
+
     if (type === "file") {
-        processFile(path);
+        console.log("Pass dir please");
     } else {
         processDir(path);
     }
@@ -34,20 +40,39 @@ function getWorkingPathAndType() {
     return [path + slash, type];
 }
 
+
 function processDir(path) {
     const files = fs.readdirSync(path);
 
+    const jackFiles = [];
     for (let i = 0; i < files.length; i++) {
         const ext = files[i].slice(-5);
 
         if (ext === ".jack") {
-            processFile(path + files[i]);
+            jackFiles.push(files[i]);
         }
     }
+
+    const tokens = [];
+    for (let i = 0; i < jackFiles.length; i++) {
+        tokens.push(processFileTokes(path + jackFiles[i]));
+    }
+    
+    for (let i = 0; i < jackFiles.length; i++) {
+        composeSymbolTable(tokens[i]);
+    }
+
+    console.log("classSymbolTable:", classSymbolTable);
+    console.log("subroutineSymbolTable", subroutineSymbolTable);
+
+    for (let i = 0; i < jackFiles.length; i++) {
+        processFile(path + jackFiles[i], tokens[i]);
+    }
+
 }
 
-function processFile(path) {
-    // TODO
+
+function processFileTokes(path) {
     console.log("Proessing: " + path);
     const sourceCode = fs.readFileSync(path, "utf8");
 
@@ -59,16 +84,22 @@ function processFile(path) {
 
     console.log("Writing to: " + process.cwd() + "/" + fileNameT);
     fs.writeFileSync(process.cwd() + "/" + fileNameT, XML);
+    
+    return tokens;
+}
+
+function processFile(path, tokens) {
+    if (tokens === undefined) {
+        tokens = processFileTokes(path);
+    }
 
     const compilerOutput = compileFile(tokens);
     
+    const pathArr = path.split("/");
     const fileName = pathArr[pathArr.length-1].slice(0, -5) + ".xml";
 
     console.log("Writing to: " + process.cwd() + "/" + fileName);
     fs.writeFileSync(process.cwd() + "/" + fileName, compilerOutput);
-
-
-
 }
 
  
